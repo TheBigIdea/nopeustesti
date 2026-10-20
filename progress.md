@@ -1,6 +1,14 @@
 # Nopeustesti – edistyminen
 
-Spesifikaatio: `NOPEUSTESTI_SPEC.md`. Kaikki vaiheet 1–6 toteutettu (2026-10-20). Ei vielä committeja.
+Spesifikaatio: `NOPEUSTESTI_SPEC.md`. Kaikki vaiheet 1–6 toteutettu (2026-10-20).
+
+## Repo ja julkaisu
+- GitHub: https://github.com/TheBigIdea/nopeustesti (julkinen), haara `main` (nimetty uudelleen masterista).
+- GitHub Pages (legacy-build `main` / root, otettu käyttöön API:lla): https://thebigidea.github.io/nopeustesti/ – päivittyy ~1 min jokaisesta pushista `main`iin.
+- Käyttäjän GitHub-tili on **TheBigIdea** (gitin `user.name` "Lauriboy" on eri asia; sillä nimellä on erillinen GitHub-tili).
+- Autentikointi: HTTPS + Git Credential Manager (token Windowsin tunnustenhallinnassa). Koneen SSH-avain `~/.ssh/id_rsa` on salasanasuojattu eikä sitä ole lisätty GitHubiin → älä käytä SSH:ta.
+- `gh`-CLI:tä ei ole asennettu; GitHub API:a voi kutsua GCM:n tokenilla (`git credential fill`).
+- Ensimmäinen kirjautuminen ei onnistunut Claude Coden `!`-komennolla (ei interaktiivinen), vaan käyttäjän omassa päätteessä.
 
 ## Tiedostot
 - `index.html` – koko peli (HTML + CSS + JS). Kaikki säädöt `CONFIG`-objektissa.
@@ -22,5 +30,5 @@ Spesifikaatio: `NOPEUSTESTI_SPEC.md`. Kaikki vaiheet 1–6 toteutettu (2026-10-2
 
 ## Testaus
 - Paikallinen palvelin: `python -m http.server 8000 --bind 0.0.0.0`, puhelimella http://192.168.1.152:8000
-- Wake Lock ja service worker vaativat HTTPS:n (tai localhostin) → eivät toimi LAN-osoitteessa. Vaihtoehdot: Chrome-flag `unsafely-treat-insecure-origin-as-secure`, tunneli (localtunnel/cloudflared) tai julkaisu (GitHub Pages tms.).
-- Headless-Chrome + CDP -skripteillä tarkistettu: asettelu 667×375, 844×390, 1024×768, ei konsolivirheitä, PWA asennettava ja toimii offline. Ääntä ei ole voitu kuunnella – käyttäjä testaa korvalla.
+- Wake Lock ja service worker vaativat HTTPS:n (tai localhostin) → eivät toimi LAN-osoitteessa. Testaa ne GitHub Pages -osoitteessa.
+- Headless-Chrome + CDP -skripteillä tarkistettu: asettelu 667×375, 844×390, 1024×768, ei konsolivirheitä, PWA asennettava ja toimii offline – myös Pages-osoitteessa. Ääntä ei ole voitu kuunnella – käyttäjä testaa korvalla. Wake lockia ei ole vielä varmistettu oikealla puhelimella.
