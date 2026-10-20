@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nopeustesti</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#121317">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nopeustesti">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23111'/%3E%3Ccircle cx='32' cy='32' r='22' fill='%23ff3b2f'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --case-hi: #34373f;
+    --case-lo: #121317;
+    --text: #e8e8e8;
+    --text-dim: #9a9ea8;
+    --led: #ff2a1a;
+    --led-ghost: rgba(255, 42, 26, 0.07);
+    --accent: #d8342a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    overscroll-behavior: none;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Dark plastic device case: soft top light plus a fine texture. */
+  body {
+    background:
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.012) 0 2px, transparent 2px 4px),
+      radial-gradient(ellipse 120% 90% at 50% 15%, var(--case-hi), var(--case-lo) 70%);
+    background-color: var(--case-lo);
+  }
+  #app {
+    /* Usable area inside notches / home indicator. */
+    --vw: 100vw;
+    --vh: 100vh;
+    --aw: calc(var(--vw) - env(safe-area-inset-left) - env(safe-area-inset-right));
+    --ah: calc(var(--vh) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    /* Four buttons plus gaps (0.18 × size each) must fit the width; height is
+       shared with the display and the menu row. */
+    --btn: min(calc((var(--aw) - 2rem) / 4.7), calc(var(--ah) * 0.42));
+    --menu-font: clamp(0.85rem, calc(var(--ah) * 0.04), 1.2rem);
+
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-evenly;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  /* Custom properties aren't validated, so the dvh upgrade needs @supports. */
+  @supports (height: 100dvh) {
+    #app { --vw: 100dvw; --vh: 100dvh; }
+  }
+
+  /* --- 7-segment LED display ------------------------------------------- */
+  #score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #display {
+    --digit-h: min(calc(var(--ah) * 0.17), calc(var(--aw) * 0.12));
+    display: flex;
+    gap: calc(var(--digit-h) * 0.12);
+    padding: calc(var(--digit-h) * 0.16) calc(var(--digit-h) * 0.22);
+    border-radius: calc(var(--digit-h) * 0.12);
+    /* Smoked red filter glass in a black bezel. */
+    background: linear-gradient(170deg, #2a0806, #120302 55%, #1b0504);
+    box-shadow:
+      0 0 0 calc(var(--digit-h) * 0.05) #08090b,
+      0 0 0 calc(var(--digit-h) * 0.07) #2c2f36,
+      inset 0 calc(var(--digit-h) * 0.04) calc(var(--digit-h) * 0.12) rgba(0, 0, 0, 0.8);
+  }
+  .digit {
+    height: var(--digit-h);
+    width: calc(var(--digit-h) * 0.6);
+    overflow: visible;
+    /* On the svg itself: filter functions on SVG children aren't reliable
+       everywhere. The ghost segments are too faint to glow visibly. */
+    filter: drop-shadow(0 0 calc(var(--digit-h) * 0.03) var(--led))
+            drop-shadow(0 0 calc(var(--digit-h) * 0.1) rgba(255, 42, 26, 0.55));
+  }
+  .digit polygon { fill: var(--led-ghost); }
+  .digit polygon.on { fill: var(--led); }
+  #best {
+    margin-top: calc(var(--ah) * 0.025);
+    font-size: min(calc(var(--ah) * 0.042), calc(var(--aw) * 0.028));
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  #best.record { color: #ffd23f; }
+
+  /* --- Arcade buttons ---------------------------------------------------- */
+  #buttons { display: flex; gap: calc(var(--btn) * 0.18); }
+  .btn {
+    --ring: calc(var(--btn) * 0.06);
+    --depth: calc(var(--btn) * 0.045);
+    width: var(--btn);
+    height: var(--btn);
+    border-radius: 50%;
+    /* Domed cap: specular highlight over the base colour, darker rim. */
+    background:
+      radial-gradient(circle at 36% 28%, rgba(255, 255, 255, 0.28), transparent 38%),
+      radial-gradient(circle at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.45) 100%),
+      var(--off);
+    /* Black bezel ring, then the cap's side showing as depth. */
+    box-shadow:
+      0 0 0 var(--ring) #0a0b0d,
+      0 var(--depth) 0 var(--ring) #050506,
+      0 calc(var(--depth) * 2) calc(var(--btn) * 0.12) var(--ring) rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    touch-action: none;
+    will-change: transform;
+    transition: transform 40ms ease-out;
+  }
+  .btn.lit {
+    background:
+      radial-gradient(circle at 36% 28%, rgba(255, 255, 255, 0.65), transparent 40%),
+      radial-gradient(circle at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.18) 100%),
+      var(--on);
+    box-shadow:
+      0 0 0 var(--ring) #0a0b0d,
+      0 var(--depth) 0 var(--ring) #050506,
+      0 0 calc(var(--btn) * 0.25) calc(var(--ring) * 1.5) var(--on),
+      0 0 calc(var(--btn) * 0.4) calc(var(--ring) * 1.5) var(--glow);
+  }
+  /* Pressed: the cap sinks into the bezel. */
+  .btn.pressed {
+    transform: translateY(calc(var(--depth) * 0.7)) scale(0.97);
+    transition: none;
+  }
+  .btn.flash { animation: flash 0.25s steps(2) infinite; }
+  @keyframes flash {
+    50% {
+      background:
+        radial-gradient(circle at 36% 28%, rgba(255, 255, 255, 0.65), transparent 40%),
+        var(--on);
+      box-shadow:
+        0 0 0 var(--ring) #0a0b0d,
+        0 var(--depth) 0 var(--ring) #050506,
+        0 0 calc(var(--btn) * 0.25) calc(var(--ring) * 1.5) var(--on);
+    }
+  }
+
+  /* --- Menu --------------------------------------------------------------
+     The menu is a row in the layout; it is only made invisible during play so
+     nothing shifts when a game starts. */
+  #menu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6em;
+    justify-content: center;
+    align-items: center;
+    font-size: var(--menu-font);
+  }
+  #menu.concealed { visibility: hidden; }
+  #menu button {
+    font: inherit;
+    font-weight: 600;
+    padding: 0.55em 1.2em;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: linear-gradient(#3b3f48, #2a2d34);
+    color: var(--text);
+    box-shadow: 0 2px 0 #0b0c0e;
+    cursor: pointer;
+  }
+  #menu button:active { transform: translateY(1px); box-shadow: 0 1px 0 #0b0c0e; }
+  #menu button.primary {
+    padding-inline: 1.8em;
+    border-color: rgba(255, 255, 255, 0.2);
+    background: linear-gradient(#e2463b, #b0261d);
+    box-shadow: 0 2px 0 #5a120d;
+  }
+  #menu button.toggle {
+    font-weight: 500;
+    color: var(--text-dim);
+    background: transparent;
+    box-shadow: none;
+  }
+
+  #rotate {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 2rem;
+    background: var(--case-lo);
+    font-size: 1.3rem;
+    text-align: center;
+  }
+  #rotate svg { width: 6rem; height: 6rem; animation: rotate-hint 2s ease-in-out infinite; }
+  @keyframes rotate-hint { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+  @media (orientation: portrait) {
+    #rotate { display: flex; }
+  }
+
+  #debug {
+    position: fixed;
+    top: env(safe-area-inset-top);
+    left: env(safe-area-inset-left);
+    padding: 0.3rem 0.5rem;
+    font: 12px ui-monospace, monospace;
+    background: rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    white-space: pre;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="score">
+    <div id="display" role="img" aria-label="Pisteet 0"></div>
+    <div id="best">Ennätys 0</div>
+  </div>
+  <div id="buttons"></div>
+  <div id="menu">
+    <button id="startNormal" class="primary">Aloita</button>
+    <button id="startHard">Vaikea</button>
+    <button id="resume" class="primary hidden">Jatka</button>
+    <button id="sound" class="toggle">Äänet: päällä</button>
+    <button id="fullscreen" class="toggle hidden">Koko näyttö</button>
+  </div>
+</div>
+<div id="rotate">
+  <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
+    <rect x="20" y="6" width="24" height="52" rx="4"/>
+    <line x1="29" y1="51" x2="35" y2="51"/>
+  </svg>
+  <div>Käännä puhelin vaakatasoon</div>
+</div>
+<div id="debug" class="hidden"></div>
+
+<script>
+'use strict';
+
+// All tunables in one place.
+const CONFIG = {
+  BUTTONS: [
+    // off/on: cap colour unlit/lit, glow: wide halo; tone: 1-based index into TONE_FREQS
+    { name: 'red',    off: '#5c1311', on: '#ff3b2f', glow: 'rgba(255, 50, 40, 0.45)',  tone: 1 },
+    { name: 'yellow', off: '#5e4f0c', on: '#ffe14a', glow: 'rgba(255, 225, 70, 0.4)',  tone: 2 },
+    { name: 'green',  off: '#11491a', on: '#45ff66', glow: 'rgba(60, 255, 100, 0.4)',  tone: 3 },
+    { name: 'orange', off: '#5e2c0a', on: '#ff8f26', glow: 'rgba(255, 140, 40, 0.45)', tone: 4 },
+  ],
+  DIGITS: 3,             // LED display width (grows if the score needs more)
+  // Tempo. The values measured from the original device (500 / 150 / 0.982 /
+  // 0.999) felt too hard, so these are gentler.
+  START_INTERVAL: 650,   // ms between lights at score 0
+  MIN_INTERVAL: 180,     // ms, hard floor
+  SCORE_FACTOR: 0.992,   // interval multiplier per point
+  TIME_FACTOR: 0.998,    // interval multiplier per second played
+  LIGHT_RATIO: 0.6,      // portion of the interval a light stays on
+  MAX_BEHIND: 50,        // queue length that ends the game
+  ALLOW_REPEAT: true,    // may the same button light twice in a row
+  HARD_START_SCORE: 100, // "Vaikea" starts at this score's speed
+  COUNTDOWN_STEP_MS: 700, // 3-2-1 before the game, per number
+  START_DELAY: 1000,     // ms of grace after resuming from a pause
+  KEYS: ['KeyA', 'KeyS', 'KeyD', 'KeyF'], // desktop testing
+  STORAGE_KEY: 'nopeustesti.best',
+  STORAGE_KEY_HARD: 'nopeustesti.best.hard',
+  MUTE_KEY: 'nopeustesti.muted',
+
+  // Sound, measured from a recording of the original (1991). The original is a
+  // piezo buzzer driven by a square wave; mostly the odd harmonics near the
+  // buzzer resonance (~4.1-4.8 kHz) are audible.
+  VOLUME: 0.5,              // master gain
+  TONE_FREQS: [141.25, 183.2, 236.9, 316.5], // square wave f0, low to high
+  BUZZER_RES_FREQ: 4300,    // resonance filter center, Hz
+  BUZZER_RES_Q: 4.5,
+  BUZZER_FILTER: 'bandpass', // or 'peaking'
+  BUZZER_DRY: 0.08,         // share of unfiltered signal mixed in
+  BUZZER_GAIN: 2.5,         // makeup gain; filtered output RMS is ~0.12
+  FADE_MS: 4,               // fade in/out on every start/stop to avoid clicks
+  TONE_SUSTAIN: true,       // tone plays until the next light (false: only while lit)
+  PRESS_MUTE_MS: 220,       // every press silences the tone this long
+  // Game over: a rough buzz through the same buzzer chain (audible on phone
+  // speakers), lower than any game tone, fading out at the end.
+  GAME_OVER_FREQ: 95,       // square wave f0, Hz; dense harmonics = rough buzz
+  GAME_OVER_LEVEL: 0.8,     // relative to game tones
+  GAME_OVER_MS: 800,
+  GAME_OVER_FADE_OUT_MS: 250,
+  COUNTDOWN_BEEP_MS: 70,    // short tick on 3, 2, 1 (0 = silent)
+};
+
+// --- Audio -----------------------------------------------------------------
+// Everything is synthesized with Web Audio; no audio files. The AudioContext
+// is created/resumed from a user gesture, which mobile browsers require.
+const audio = {
+  ctx: null,
+  master: null,
+  muted: false,
+  voice: null,       // continuous game tone: { osc, out }
+  voiceOn: false,
+  oneShots: [],      // playing one-shot sounds: { osc, out }
+
+  unlock() {
+    if (!this.ctx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      this.ctx = new Ctx({ latencyHint: 'interactive' });
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : CONFIG.VOLUME;
+      this.master.connect(this.ctx.destination);
+      // iOS needs something to actually play inside the gesture.
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.ctx.createBuffer(1, 1, 22050);
+      src.connect(this.master);
+      src.start();
+    }
+    // Also recovers from iOS "interrupted" state (calls, backgrounding).
+    if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
+  },
+
+  setMuted(muted) {
+    this.muted = muted;
+    if (this.master) {
+      this.master.gain.setTargetAtTime(muted ? 0 : CONFIG.VOLUME, this.ctx.currentTime, 0.01);
+    }
+  },
+
+  // Square wave -> resonance filter (+ a little dry signal) -> out gain.
+  // `out` starts silent; callers fade it in.
+  createBuzzer(freq) {
+    const ctx = this.ctx;
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    const filter = ctx.createBiquadFilter();
+    filter.type = CONFIG.BUZZER_FILTER;
+    filter.frequency.value = CONFIG.BUZZER_RES_FREQ;
+    filter.Q.value = CONFIG.BUZZER_RES_Q;
+    if (CONFIG.BUZZER_FILTER === 'peaking') filter.gain.value = 24;
+    const dry = ctx.createGain();
+    dry.gain.value = CONFIG.BUZZER_DRY;
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    osc.connect(filter).connect(out);
+    osc.connect(dry).connect(out);
+    out.connect(this.master);
+    return { osc, out };
+  },
+
+  // Linear fade of a gain param from its current value, starting at time t.
+  fade(param, target, t = this.ctx.currentTime) {
+    param.cancelScheduledValues(t);
+    param.setValueAtTime(param.value, t);
+    param.linearRampToValueAtTime(target, t + CONFIG.FADE_MS / 1000);
+  },
+
+  // Plays node from t0 to t1 (AudioContext time) with fades at both ends.
+  schedule(node, level, t0, t1, fadeOutMs = CONFIG.FADE_MS) {
+    const fadeIn = CONFIG.FADE_MS / 1000;
+    const fadeOut = Math.max(fadeOutMs, CONFIG.FADE_MS) / 1000;
+    const g = node.out.gain;
+    g.setValueAtTime(0, t0);
+    g.linearRampToValueAtTime(level, t0 + fadeIn);
+    g.setValueAtTime(level, Math.max(t0 + fadeIn, t1 - fadeOut));
+    g.linearRampToValueAtTime(0, t1);
+    node.osc.start(t0);
+    node.osc.stop(t1 + 0.01);
+  },
+
+  stopNode(node) {
+    const t = this.ctx.currentTime;
+    this.fade(node.out.gain, 0, t);
+    try { node.osc.stop(t + CONFIG.FADE_MS / 1000 + 0.01); } catch {}
+  },
+
+  // --- Game tone: one continuous buzzer whose pitch follows the lights.
+  startVoice() {
+    if (!this.ctx) return;
+    this.stopVoice();
+    this.stopOneShots();
+    this.voice = this.createBuzzer(CONFIG.TONE_FREQS[0]);
+    this.voice.osc.start();
+    this.voiceOn = false;
+  },
+
+  // Pitch changes immediately, with no gap, as on the original.
+  setTone(freq) {
+    if (this.voice) this.voice.osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+  },
+
+  setVoiceOn(on) {
+    if (!this.voice || on === this.voiceOn) return;
+    this.voiceOn = on;
+    this.fade(this.voice.out.gain, on ? CONFIG.BUZZER_GAIN : 0);
+  },
+
+  stopVoice() {
+    if (!this.voice) return;
+    this.stopNode(this.voice);
+    this.voice = null;
+    this.voiceOn = false;
+  },
+
+  // --- One-shot sounds (game over, countdown ticks).
+  oneShot(freq, level, ms, fadeOutMs) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + 0.005;
+    const node = this.createBuzzer(freq);
+    this.schedule(node, level, t0, t0 + ms / 1000, fadeOutMs);
+    this.oneShots.push(node);
+    node.osc.onended = () => {
+      this.oneShots = this.oneShots.filter((n) => n !== node);
+    };
+  },
+
+  // A low, rough buzz that fades out: clearly "over" without being harsh.
+  gameOver() {
+    this.stopVoice();
+    this.stopOneShots();
+    this.oneShot(
+      CONFIG.GAME_OVER_FREQ,
+      CONFIG.BUZZER_GAIN * CONFIG.GAME_OVER_LEVEL,
+      CONFIG.GAME_OVER_MS,
+      CONFIG.GAME_OVER_FADE_OUT_MS
+    );
+  },
+
+  countdownBeep() {
+    if (CONFIG.COUNTDOWN_BEEP_MS <= 0) return;
+    const freqs = CONFIG.TONE_FREQS;
+    this.oneShot(freqs[freqs.length - 1], CONFIG.BUZZER_GAIN * 0.6, CONFIG.COUNTDOWN_BEEP_MS);
+  },
+
+  stopOneShots() {
+    for (const node of this.oneShots) this.stopNode(node);
+    this.oneShots = [];
+  },
+};
+
+try { audio.muted = localStorage.getItem(CONFIG.MUTE_KEY) === '1'; } catch {}
+
+const $ = (id) => document.getElementById(id);
+const displayEl = $('display');
+const bestEl = $('best');
+const buttonsEl = $('buttons');
+const menuEl = $('menu');
+const resumeEl = $('resume');
+
+// Optional latency overlay: open the page with ?debug
+const debug = new URLSearchParams(location.search).has('debug');
+const debugEl = $('debug');
+const debugInfo = { fps: 0, frames: 0, fpsSince: 0, inputDelay: 0, maxInputDelay: 0 };
+if (debug) debugEl.classList.remove('hidden');
+
+// Each button tracks its own active pointers, so multitouch works independently
+// per button. Only pointerdown counts as a press; sliding a finger onto a button
+// does nothing, just like a physical button.
+const buttonEls = CONFIG.BUTTONS.map((b, i) => {
+  const el = document.createElement('div');
+  el.className = 'btn';
+  el.style.setProperty('--off', b.off);
+  el.style.setProperty('--on', b.on);
+  el.style.setProperty('--glow', b.glow);
+  const pointers = new Set();
+
+  el.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    pointers.add(e.pointerId);
+    el.setPointerCapture?.(e.pointerId);
+    el.classList.add('pressed');
+    if (debug) trackInputDelay(e);
+    press(i);
+  });
+
+  const release = (e) => {
+    if (!pointers.delete(e.pointerId)) return;
+    if (pointers.size === 0) el.classList.remove('pressed');
+  };
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release);
+  el.addEventListener('lostpointercapture', release);
+
+  buttonsEl.appendChild(el);
+  return el;
+});
+
+function trackInputDelay(e) {
+  // Time from the OS delivering the event to our handler running.
+  const delay = performance.now() - e.timeStamp;
+  debugInfo.inputDelay = delay;
+  debugInfo.maxInputDelay = Math.max(debugInfo.maxInputDelay, delay);
+}
+
+function debugFrame(now) {
+  debugInfo.frames++;
+  if (now - debugInfo.fpsSince >= 1000) {
+    debugInfo.fps = Math.round(debugInfo.frames * 1000 / (now - debugInfo.fpsSince));
+    debugInfo.frames = 0;
+    debugInfo.fpsSince = now;
+  }
+  debugEl.textContent =
+    `fps ${debugInfo.fps}\n` +
+    `input ${debugInfo.inputDelay.toFixed(1)} ms (max ${debugInfo.maxInputDelay.toFixed(1)})\n` +
+    `interval ${state.phase === 'playing' ? currentInterval(now).toFixed(0) : '-'} ms\n` +
+    `queue ${state.queue.length}\n` +
+    `wake lock ${wake.status()}`;
+  requestAnimationFrame(debugFrame);
+}
+
+// --- 7-segment LED display ---------------------------------------------------
+// Each digit is an SVG with seven hexagonal segments (a-g); unlit segments stay
+// faintly visible like on a real LED display.
+const SEGMENTS = (() => {
+  const t = 10, g = 2;             // segment thickness, gap between segments
+  const L = 6, R = 54, T = 6, M = 50, B = 94;
+  const h = (yc, x1, x2) =>
+    `${x1},${yc} ${x1 + t / 2},${yc - t / 2} ${x2 - t / 2},${yc - t / 2} ` +
+    `${x2},${yc} ${x2 - t / 2},${yc + t / 2} ${x1 + t / 2},${yc + t / 2}`;
+  const v = (xc, y1, y2) =>
+    `${xc},${y1} ${xc + t / 2},${y1 + t / 2} ${xc + t / 2},${y2 - t / 2} ` +
+    `${xc},${y2} ${xc - t / 2},${y2 - t / 2} ${xc - t / 2},${y1 + t / 2}`;
+  return {
+    a: h(T, L + g, R - g), g: h(M, L + g, R - g), d: h(B, L + g, R - g),
+    f: v(L, T + g, M - g), b: v(R, T + g, M - g),
+    e: v(L, M + g, B - g), c: v(R, M + g, B - g),
+  };
+})();
+const GLYPHS = {
+  '0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg', '4': 'bcfg',
+  '5': 'acdfg', '6': 'acdefg', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg',
+  '-': 'g', ' ': '',
+};
+
+const led = {
+  digits: [], // per digit: { a: polygonEl, b: ..., ... }
+
+  build(count) {
+    const ns = 'http://www.w3.org/2000/svg';
+    displayEl.replaceChildren();
+    this.digits = [];
+    for (let i = 0; i < count; i++) {
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('class', 'digit');
+      svg.setAttribute('viewBox', '0 0 60 100');
+      const group = document.createElementNS(ns, 'g');
+      group.setAttribute('transform', 'translate(5 0) skewX(-6) translate(5 0)');
+      const segs = {};
+      for (const [name, points] of Object.entries(SEGMENTS)) {
+        const p = document.createElementNS(ns, 'polygon');
+        p.setAttribute('points', points);
+        group.appendChild(p);
+        segs[name] = p;
+      }
+      svg.appendChild(group);
+      displayEl.appendChild(svg);
+      this.digits.push(segs);
+    }
+  },
+
+  // Right-aligned text; the display widens if the text doesn't fit.
+  show(text) {
+    const count = Math.max(CONFIG.DIGITS, text.length);
+    if (count !== this.digits.length) this.build(count);
+    const padded = text.padStart(count, ' ');
+    this.digits.forEach((segs, i) => {
+      const lit = GLYPHS[padded[i]] ?? '';
+      for (const name in segs) segs[name].classList.toggle('on', lit.includes(name));
+    });
+    displayEl.setAttribute('aria-label', text.trim());
+  },
+};
+led.show('0');
+
+// Game state
+const state = {
+  phase: 'idle',      // idle | playing | paused | over
+  hard: false,
+  score: 0,
+  countdown: 0,       // number currently shown in the 3-2-1 countdown
+  speedOffset: 0,     // added to score when computing speed (hard mode)
+  queue: [],          // FIFO of lit-but-unacknowledged button indices
+  startTime: 0,       // performance.now() of game start (shifted on resume)
+  nextLightAt: 0,
+  litIndex: -1,
+  litUntil: 0,
+  lastIndex: -1,
+  muteUntil: 0,       // tone is silenced until this time after each press
+  pausedAt: 0,
+  rafId: 0,
+};
+
+// Normal and hard mode keep separate records.
+const best = { normal: 0, hard: 0 };
+try {
+  best.normal = parseInt(localStorage.getItem(CONFIG.STORAGE_KEY), 10) || 0;
+  best.hard = parseInt(localStorage.getItem(CONFIG.STORAGE_KEY_HARD), 10) || 0;
+} catch {}
+
+function renderBest(newRecord = false) {
+  bestEl.classList.toggle('record', newRecord);
+  if (newRecord) {
+    bestEl.textContent = `Uusi ennätys${state.hard ? ' (vaikea)' : ''}!`;
+    return;
+  }
+  bestEl.textContent = best.hard > 0
+    ? `Ennätys ${best.normal} · Vaikea ${best.hard}`
+    : `Ennätys ${best.normal}`;
+}
+renderBest();
+
+function currentInterval(now) {
+  const seconds = Math.max(0, (now - state.startTime) / 1000);
+  const s = state.score + state.speedOffset;
+  return Math.max(
+    CONFIG.MIN_INTERVAL,
+    CONFIG.START_INTERVAL * CONFIG.SCORE_FACTOR ** s * CONFIG.TIME_FACTOR ** seconds
+  );
+}
+
+function pickButton() {
+  const n = CONFIG.BUTTONS.length;
+  if (CONFIG.ALLOW_REPEAT || state.lastIndex < 0) return Math.floor(Math.random() * n);
+  const i = Math.floor(Math.random() * (n - 1));
+  return i >= state.lastIndex ? i + 1 : i;
+}
+
+function setLit(index) {
+  if (state.litIndex >= 0) buttonEls[state.litIndex].classList.remove('lit');
+  state.litIndex = index;
+  if (index >= 0) buttonEls[index].classList.add('lit');
+}
+
+function toneFreq(index) {
+  return CONFIG.TONE_FREQS[CONFIG.BUTTONS[index].tone - 1];
+}
+
+// The game tone is on once the first light has come, unless a press muted it
+// or (without TONE_SUSTAIN) the light has already gone out.
+function updateVoice(now) {
+  const on = state.phase === 'playing'
+    && state.lastIndex >= 0
+    && now >= state.muteUntil
+    && (CONFIG.TONE_SUSTAIN || now < state.litUntil);
+  audio.setVoiceOn(on);
+}
+
+// The game runs in phase 'playing' from the start; until startTime the display
+// shows a 3-2-1 countdown and presses are ignored.
+function startGame(hard) {
+  state.phase = 'playing';
+  state.hard = hard;
+  state.score = 0;
+  state.speedOffset = hard ? CONFIG.HARD_START_SCORE : 0;
+  state.queue = [];
+  state.lastIndex = -1;
+  state.muteUntil = 0;
+  state.countdown = 0;
+  audio.startVoice();
+  const now = performance.now();
+  state.startTime = now + 3 * CONFIG.COUNTDOWN_STEP_MS;
+  state.nextLightAt = state.startTime;
+  setLit(-1);
+  buttonEls.forEach((el) => el.classList.remove('flash'));
+  renderBest();
+  menuEl.classList.add('concealed');
+  wake.acquire();
+  cancelAnimationFrame(state.rafId);
+  state.rafId = requestAnimationFrame(tick);
+}
+
+function tick(now) {
+  if (state.phase !== 'playing') return;
+
+  updateCountdown(now);
+  if (state.litIndex >= 0 && now >= state.litUntil) setLit(-1);
+
+  // Catch up on every light that is due; timestamps are absolute, so no drift.
+  while (now >= state.nextLightAt) {
+    const at = state.nextLightAt;
+    const interval = currentInterval(at);
+    const index = pickButton();
+    state.lastIndex = index;
+    state.queue.push(index);
+    state.litUntil = at + interval * CONFIG.LIGHT_RATIO;
+    state.nextLightAt = at + interval;
+    setLit(now < state.litUntil ? index : -1);
+    audio.setTone(toneFreq(index));
+
+    if (state.queue.length > CONFIG.MAX_BEHIND) {
+      gameOver(index);
+      return;
+    }
+  }
+
+  updateVoice(now);
+  state.rafId = requestAnimationFrame(tick);
+}
+
+function updateCountdown(now) {
+  const n = now < state.startTime
+    ? Math.ceil((state.startTime - now) / CONFIG.COUNTDOWN_STEP_MS)
+    : 0;
+  if (n === state.countdown) return;
+  state.countdown = n;
+  if (n > 0) {
+    led.show(String(n));
+    audio.countdownBeep();
+  } else {
+    led.show(String(state.score));
+  }
+}
+
+function press(index) {
+  if (state.phase !== 'playing') return;
+  const now = performance.now();
+  if (now < state.startTime) return; // countdown still running
+  state.muteUntil = now + CONFIG.PRESS_MUTE_MS;
+  updateVoice(now);
+  if (state.queue.length === 0 || state.queue[0] !== index) {
+    gameOver(index);
+    return;
+  }
+  state.queue.shift();
+  state.score++;
+  led.show(String(state.score));
+}
+
+function gameOver(flashIndex) {
+  state.phase = 'over';
+  cancelAnimationFrame(state.rafId);
+  setLit(-1);
+  audio.gameOver();
+  wake.release();
+  buttonEls[flashIndex].classList.add('flash');
+  setTimeout(() => buttonEls[flashIndex].classList.remove('flash'), 1500);
+
+  const mode = state.hard ? 'hard' : 'normal';
+  if (state.score > best[mode]) {
+    best[mode] = state.score;
+    const key = state.hard ? CONFIG.STORAGE_KEY_HARD : CONFIG.STORAGE_KEY;
+    try { localStorage.setItem(key, String(state.score)); } catch {}
+    renderBest(true);
+  }
+  // Short lockout so a frantic extra tap doesn't immediately restart.
+  setTimeout(() => {
+    if (state.phase === 'over') menuEl.classList.remove('concealed');
+  }, 800);
+}
+
+function pause() {
+  if (state.phase !== 'playing') return;
+  state.phase = 'paused';
+  state.pausedAt = performance.now();
+  cancelAnimationFrame(state.rafId);
+  setLit(-1);
+  updateVoice(state.pausedAt);
+  menuEl.classList.remove('concealed');
+  $('startNormal').classList.add('hidden');
+  $('startHard').classList.add('hidden');
+  resumeEl.classList.remove('hidden');
+}
+
+function resume() {
+  if (state.phase !== 'paused') return;
+  // Shift all timestamps by the paused duration plus a short grace period.
+  const shift = performance.now() - state.pausedAt + CONFIG.START_DELAY;
+  state.startTime += shift;
+  state.nextLightAt += shift;
+  state.litUntil += shift;
+  // Keep the tone silent during the grace period too.
+  state.muteUntil = Math.max(state.muteUntil + shift, performance.now() + CONFIG.START_DELAY);
+  state.phase = 'playing';
+  menuEl.classList.add('concealed');
+  $('startNormal').classList.remove('hidden');
+  $('startHard').classList.remove('hidden');
+  resumeEl.classList.add('hidden');
+  state.rafId = requestAnimationFrame(tick);
+}
+
+$('startNormal').addEventListener('click', () => startGame(false));
+$('startHard').addEventListener('click', () => startGame(true));
+resumeEl.addEventListener('click', resume);
+
+const soundEl = $('sound');
+const updateSoundLabel = () => {
+  soundEl.textContent = audio.muted ? 'Äänet: pois' : 'Äänet: päällä';
+};
+updateSoundLabel();
+soundEl.addEventListener('click', () => {
+  audio.setMuted(!audio.muted);
+  try { localStorage.setItem(CONFIG.MUTE_KEY, audio.muted ? '1' : '0'); } catch {}
+  updateSoundLabel();
+});
+
+// Unlock audio on any user gesture (capture phase, so it runs before the
+// handlers above). touchend/click cover older iOS versions.
+for (const type of ['pointerdown', 'touchend', 'click', 'keydown']) {
+  document.addEventListener(type, () => audio.unlock(), { capture: true, passive: true });
+}
+
+// --- Fullscreen + landscape lock --------------------------------------------
+// iPhone Safari has no element fullscreen; the button stays hidden there.
+const fullscreenEl = $('fullscreen');
+const root = document.documentElement;
+const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+// Installed as an app it already runs fullscreen/standalone; no button needed.
+const installed = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches
+  || navigator.standalone === true;
+if (!installed && (document.fullscreenEnabled || document.webkitFullscreenEnabled)) {
+  fullscreenEl.classList.remove('hidden');
+}
+
+async function toggleFullscreen() {
+  try {
+    if (fsElement()) {
+      await (document.exitFullscreen?.() ?? document.webkitExitFullscreen?.());
+      return;
+    }
+    await (root.requestFullscreen?.({ navigationUI: 'hide' }) ?? root.webkitRequestFullscreen?.());
+    // Orientation lock only works in fullscreen, and only on some platforms.
+    await screen.orientation?.lock?.('landscape');
+  } catch {
+    // Unsupported or refused; the game works without it.
+  }
+}
+
+const updateFullscreenLabel = () => {
+  fullscreenEl.textContent = fsElement() ? 'Poistu koko näytöstä' : 'Koko näyttö';
+};
+fullscreenEl.addEventListener('click', toggleFullscreen);
+document.addEventListener('fullscreenchange', updateFullscreenLabel);
+document.addEventListener('webkitfullscreenchange', updateFullscreenLabel);
+
+// --- Screen Wake Lock --------------------------------------------------------
+// Keeps the screen on while a game is running or paused. Requires a secure
+// context (HTTPS or localhost). The browser drops the lock when the page is
+// hidden, so it is re-requested on return.
+const wake = {
+  lock: null,
+  async acquire() {
+    if (this.lock || !('wakeLock' in navigator)) return;
+    try {
+      this.lock = await navigator.wakeLock.request('screen');
+      this.lock.addEventListener('release', () => { this.lock = null; });
+    } catch {
+      this.lock = null;
+    }
+  },
+  release() {
+    this.lock?.release().catch(() => {});
+    this.lock = null;
+  },
+  status() {
+    if (!('wakeLock' in navigator)) return 'ei tuettu';
+    return this.lock ? 'päällä' : 'pois';
+  },
+};
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    pause();
+  } else if (state.phase === 'playing' || state.phase === 'paused') {
+    wake.acquire();
+  }
+});
+
+// Turning to portrait covers the game, so pause it.
+matchMedia('(orientation: portrait)').addEventListener('change', (e) => {
+  if (e.matches) pause();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  const i = CONFIG.KEYS.indexOf(e.code);
+  if (i < 0) return;
+  buttonEls[i].classList.add('pressed');
+  if (debug) trackInputDelay(e);
+  press(i);
+});
+
+document.addEventListener('keyup', (e) => {
+  const i = CONFIG.KEYS.indexOf(e.code);
+  if (i >= 0) buttonEls[i].classList.remove('pressed');
+});
+
+// Block browser gestures that would interfere: long-press menu, double-tap
+// zoom, pinch zoom (iOS gesture* events), scrolling and rubber-banding.
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+document.addEventListener('dblclick', (e) => e.preventDefault());
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+// touchstart default is blocked only on the game buttons, so menu buttons
+// still get their click events. This also stops iOS text-selection loupes.
+buttonsEl.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+
+if (debug) requestAnimationFrame(debugFrame);
+
+// --- PWA: offline cache --------------------------------------------------------
+// Service workers need a secure context (HTTPS or localhost); elsewhere
+// navigator.serviceWorker is undefined and this is skipped.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
