@@ -159,7 +159,7 @@
     color: var(--yellow);
     letter-spacing: 4px;
   }
-  #startBtn {
+  .big-start {
     flex: none;
     width: 184px;
     height: 184px;
@@ -173,7 +173,7 @@
     letter-spacing: 1px;
     box-shadow: 0 10px 0 var(--yellow-edge), 0 0 0 10px var(--red-darker);
   }
-  #startBtn:active {
+  .big-start:active {
     transform: translateY(5px);
     box-shadow: 0 5px 0 var(--yellow-edge), 0 0 0 10px var(--red-darker);
   }
@@ -257,29 +257,21 @@
   }
 
   /* --- Result view ---------------------------------------------------------- */
+  /* Same frame as the start view: big title, info on the left, ALOITA right. */
   #viewResult {
-    padding: 28px 40px;
-    align-items: center;
+    padding: 26px 44px;
     justify-content: center;
-    gap: 22px;
+    gap: 18px;
   }
-  .title-mid {
-    font-family: var(--font-display);
-    font-size: 40px;
-    line-height: 1;
-    color: var(--yellow);
-    text-shadow: 0 4px 0 var(--red-darker);
-  }
-  .result-row { display: flex; align-items: center; gap: 24px; }
+  .result-left { display: flex; align-items: center; gap: 20px; }
   .result-score {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 6px;
+    gap: 4px;
     background: var(--black);
     border: 4px solid var(--red-darker);
-    border-radius: 16px;
-    padding: 14px 34px;
+    border-radius: 14px;
+    padding: 12px 28px;
   }
   .result-score .label { color: var(--yellow); }
   #resultScore {
@@ -289,40 +281,44 @@
     color: var(--yellow);
     letter-spacing: 8px;
   }
-  .result-side { display: flex; flex-direction: column; gap: 10px; }
-  #recordBadge {
-    align-self: flex-start;
-    background: var(--yellow);
-    color: var(--black);
-    font-weight: 700;
-    font-size: 16px;
-    padding: 8px 16px;
+  .result-new {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .result-new[hidden], #resultOld[hidden] { display: none; }
+  .record-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--red-dark);
+    border: 3px solid var(--yellow);
     border-radius: 30px;
-  }
-  #resultBest { font-size: 16px; line-height: 1.4; }
-  .result-actions { display: flex; align-items: center; gap: 16px; }
-  #againBtn {
-    min-height: 44px;
-    padding: 14px 30px;
-    border: none;
-    border-radius: 40px;
-    background: var(--yellow);
-    color: var(--black);
-    font-family: var(--font-display);
-    font-size: 20px;
-    box-shadow: 0 6px 0 var(--yellow-edge);
-  }
-  #againBtn:active { transform: translateY(3px); box-shadow: 0 3px 0 var(--yellow-edge); }
-  #homeBtn {
-    min-height: 44px;
-    padding: 14px 20px;
-    border: 2px solid var(--white);
-    border-radius: 40px;
-    background: transparent;
-    font-weight: 600;
+    padding: 6px 16px 6px 12px;
+    box-shadow: 0 4px 0 var(--red-darker);
     font-size: 16px;
+    font-weight: 700;
+    color: var(--yellow);
   }
-  #homeBtn:active { background: rgba(255, 255, 255, 0.12); }
+  .record-badge svg { width: 22px; height: 22px; }
+  .prev-record {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--black);
+    border: 3px solid var(--red-darker);
+    border-radius: 12px;
+    padding: 8px 18px;
+  }
+  .prev-record .label { color: var(--yellow); }
+  .prev-record .value {
+    font-family: var(--font-digits);
+    font-size: 30px;
+    line-height: 1;
+    color: var(--yellow);
+    letter-spacing: 4px;
+  }
 
   /* --- Sound / fullscreen icons: small and quiet, top-right of the card ------ */
   #tools {
@@ -407,7 +403,7 @@
           <span class="value" id="startLast">---</span>
         </div>
       </div>
-      <button id="startBtn">ALOITA</button>
+      <button id="startBtn" class="big-start">ALOITA</button>
     </div>
   </section>
 
@@ -424,20 +420,34 @@
   </section>
 
   <section id="viewResult" class="view" hidden>
-    <div class="title-mid">PELI PÄÄTTYI</div>
-    <div class="result-row">
-      <div class="result-score">
-        <span class="label">PISTEET</span>
-        <span id="resultScore">000</span>
+    <div class="title-big">PELI PÄÄTTYI</div>
+    <div class="start-row">
+      <div class="result-left">
+        <div class="result-score">
+          <span class="label">PISTEET</span>
+          <span id="resultScore">000</span>
+        </div>
+        <!-- New record: badge + previous record -->
+        <div id="resultNew" class="result-new">
+          <div class="record-badge">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="#FFD100" stroke="#FFD100" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5-4.8-4.6 6.6-.9z"/></svg>
+            <span>Uusi ennätys!</span>
+          </div>
+          <div class="prev-record">
+            <span class="label">EDELLINEN ENNÄTYS</span>
+            <span class="value" id="resultPrevBest">000</span>
+          </div>
+        </div>
+        <!-- No record: the record, as on the start view -->
+        <div id="resultOld" class="stat-best">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="#FFD100" stroke="#FFD100" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5-4.8-4.6 6.6-.9z"/></svg>
+          <div class="stat-col">
+            <span class="label">ENNÄTYS</span>
+            <span class="value" id="resultBest">000</span>
+          </div>
+        </div>
       </div>
-      <div class="result-side">
-        <div id="recordBadge">Uusi ennätys!</div>
-        <div id="resultBest">Edellinen ennätys 000</div>
-      </div>
-    </div>
-    <div class="result-actions">
-      <button id="againBtn">PELAA UUDESTAAN</button>
-      <button id="homeBtn">Alkuun</button>
+      <button id="againBtn" class="big-start">ALOITA</button>
     </div>
   </section>
 
@@ -811,10 +821,10 @@ function showStart() {
 let resultShownAt = 0;
 function showResult(score, newRecord, previousBest) {
   $('resultScore').textContent = pad(score);
-  $('recordBadge').hidden = !newRecord;
-  $('resultBest').textContent = newRecord
-    ? `Edellinen ennätys ${pad(previousBest)}`
-    : `Ennätys ${pad(scores.best)}`;
+  $('resultNew').hidden = !newRecord;
+  $('resultOld').hidden = newRecord;
+  $('resultPrevBest').textContent = pad(previousBest);
+  $('resultBest').textContent = pad(scores.best);
   resultShownAt = performance.now();
   showView('result');
 }
@@ -1010,11 +1020,6 @@ $('startBtn').addEventListener('click', startGame);
 $('againBtn').addEventListener('click', () => {
   if (performance.now() - resultShownAt < CONFIG.RESULT_LOCK_MS) return;
   startGame();
-});
-$('homeBtn').addEventListener('click', () => {
-  if (performance.now() - resultShownAt < CONFIG.RESULT_LOCK_MS) return;
-  state.phase = 'idle';
-  showStart();
 });
 
 const soundEl = $('sound');
