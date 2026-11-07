@@ -5,29 +5,54 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Nopeustesti</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#121317">
+<meta name="theme-color" content="#6E0812">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Nopeustesti">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23111'/%3E%3Ccircle cx='32' cy='32' r='22' fill='%23ff3b2f'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23FFD100'/%3E%3Ccircle cx='32' cy='32' r='20' fill='%23B3101F'/%3E%3C/svg%3E">
+<link rel="preload" href="fonts/bungee-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/rubik-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/share-tech-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+  /* Google Fonts (OFL), latin subset, self-hosted so the game works offline. */
+  @font-face {
+    font-family: 'Bungee';
+    font-weight: 400;
+    font-display: swap;
+    src: url(fonts/bungee-latin.woff2) format('woff2');
+  }
+  @font-face {
+    font-family: 'Rubik';
+    font-weight: 300 900; /* variable font */
+    font-display: swap;
+    src: url(fonts/rubik-latin.woff2) format('woff2');
+  }
+  @font-face {
+    font-family: 'Share Tech Mono';
+    font-weight: 400;
+    font-display: swap;
+    src: url(fonts/share-tech-mono-latin.woff2) format('woff2');
+  }
+
+  /* Colours, fonts and sizes from the design canvas (844 × 390 px). */
   :root {
-    --case-hi: #34373f;
-    --case-lo: #121317;
-    --text: #e8e8e8;
-    --text-dim: #9a9ea8;
-    --led: #ff2a1a;
-    --led-ghost: rgba(255, 42, 26, 0.07);
-    --accent: #d8342a;
+    --red: #B3101F;
+    --red-dark: #8E0B1C;
+    --red-darker: #6E0812;
+    --yellow: #FFD100;
+    --yellow-edge: #A88A00;
+    --black: #141414;
+    --white: #FFFFFF;
+    --font-display: Bungee, Rubik, sans-serif;
+    --font-digits: 'Share Tech Mono', monospace;
+    --font-text: Rubik, system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
     height: 100%;
-    color: var(--text);
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
@@ -36,165 +61,293 @@
     overflow: hidden;
     -webkit-tap-highlight-color: transparent;
   }
-  /* Dark plastic device case: soft top light plus a fine texture. */
   body {
-    background:
-      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.012) 0 2px, transparent 2px 4px),
-      radial-gradient(ellipse 120% 90% at 50% 15%, var(--case-hi), var(--case-lo) 70%);
-    background-color: var(--case-lo);
+    background: var(--red-darker);
+    color: var(--white);
+    font-family: var(--font-text);
   }
-  #app {
-    /* Usable area inside notches / home indicator. */
-    --vw: 100vw;
-    --vh: 100vh;
-    --aw: calc(var(--vw) - env(safe-area-inset-left) - env(safe-area-inset-right));
-    --ah: calc(var(--vh) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    /* Four buttons plus gaps (0.18 × size each) must fit the width; height is
-       shared with the display and the menu row. */
-    --btn: min(calc((var(--aw) - 2rem) / 4.7), calc(var(--ah) * 0.42));
-    --menu-font: clamp(0.85rem, calc(var(--ah) * 0.04), 1.2rem);
+  button { font: inherit; color: inherit; margin: 0; cursor: pointer; }
 
-    height: 100vh;
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-evenly;
+  /* The design is laid out at a fixed 844 × 390 and scaled uniformly to fit the
+     usable area inside notches / home indicator (see fitStage()). */
+  #viewport {
+    position: fixed;
+    inset: 0;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
-  /* Custom properties aren't validated, so the dvh upgrade needs @supports. */
-  @supports (height: 100dvh) {
-    #app { --vw: 100dvw; --vh: 100dvh; }
+  #fit { position: relative; width: 100%; height: 100%; }
+  #stage {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 844px;
+    height: 390px;
+    transform: translate(-50%, -50%) scale(var(--scale, 1));
   }
-
-  /* --- 7-segment LED display ------------------------------------------- */
-  #score {
+  .view {
+    position: absolute;
+    inset: 0;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    background: var(--red);
+    border: 6px solid var(--yellow);
+    border-radius: 28px;
+    overflow: hidden;
   }
-  #display {
-    --digit-h: min(calc(var(--ah) * 0.17), calc(var(--aw) * 0.12));
-    display: flex;
-    gap: calc(var(--digit-h) * 0.12);
-    padding: calc(var(--digit-h) * 0.16) calc(var(--digit-h) * 0.22);
-    border-radius: calc(var(--digit-h) * 0.12);
-    /* Smoked red filter glass in a black bezel. */
-    background: linear-gradient(170deg, #2a0806, #120302 55%, #1b0504);
-    box-shadow:
-      0 0 0 calc(var(--digit-h) * 0.05) #08090b,
-      0 0 0 calc(var(--digit-h) * 0.07) #2c2f36,
-      inset 0 calc(var(--digit-h) * 0.04) calc(var(--digit-h) * 0.12) rgba(0, 0, 0, 0.8);
+  .view[hidden] { display: none; }
+  .label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
   }
-  .digit {
-    height: var(--digit-h);
-    width: calc(var(--digit-h) * 0.6);
-    overflow: visible;
-    /* On the svg itself: filter functions on SVG children aren't reliable
-       everywhere. The ghost segments are too faint to glow visibly. */
-    filter: drop-shadow(0 0 calc(var(--digit-h) * 0.03) var(--led))
-            drop-shadow(0 0 calc(var(--digit-h) * 0.1) rgba(255, 42, 26, 0.55));
-  }
-  .digit polygon { fill: var(--led-ghost); }
-  .digit polygon.on { fill: var(--led); }
-  #best {
-    margin-top: calc(var(--ah) * 0.025);
-    font-size: min(calc(var(--ah) * 0.042), calc(var(--aw) * 0.028));
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-  }
-  #best.record { color: #ffd23f; }
 
-  /* --- Arcade buttons ---------------------------------------------------- */
-  #buttons { display: flex; gap: calc(var(--btn) * 0.18); }
-  .btn {
-    --ring: calc(var(--btn) * 0.06);
-    --depth: calc(var(--btn) * 0.045);
-    width: var(--btn);
-    height: var(--btn);
+  /* --- Start view ----------------------------------------------------------- */
+  #viewStart {
+    padding: 26px 44px;
+    justify-content: center;
+    gap: 18px;
+  }
+  .title-big {
+    font-family: var(--font-display);
+    font-size: 62px;
+    line-height: 1;
+    color: var(--yellow);
+    letter-spacing: 1px;
+    white-space: nowrap;
+    text-shadow: 0 4px 0 var(--red-darker);
+  }
+  .start-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+  }
+  .stats { display: flex; align-items: stretch; gap: 16px; }
+  .stat-best {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--red-dark);
+    border: 3px solid var(--yellow);
+    border-radius: 14px;
+    padding: 8px 18px;
+    box-shadow: 0 5px 0 var(--red-darker);
+  }
+  .stat-best svg { width: 30px; height: 30px; }
+  .stat-col { display: flex; flex-direction: column; gap: 2px; }
+  .stat-best .value {
+    font-family: var(--font-display);
+    font-size: 34px;
+    line-height: 1;
+    color: var(--yellow);
+  }
+  .stat-last {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    background: var(--black);
+    border: 3px solid var(--red-darker);
+    border-radius: 12px;
+    padding: 8px 18px;
+  }
+  .stat-last .label { color: var(--yellow); }
+  .stat-last .value {
+    font-family: var(--font-digits);
+    font-size: 34px;
+    line-height: 1;
+    color: var(--yellow);
+    letter-spacing: 4px;
+  }
+  #startBtn {
+    flex: none;
+    width: 184px;
+    height: 184px;
+    margin-right: 10px;
+    border: none;
     border-radius: 50%;
-    /* Domed cap: specular highlight over the base colour, darker rim. */
-    background:
-      radial-gradient(circle at 36% 28%, rgba(255, 255, 255, 0.28), transparent 38%),
-      radial-gradient(circle at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.45) 100%),
-      var(--off);
-    /* Black bezel ring, then the cap's side showing as depth. */
-    box-shadow:
-      0 0 0 var(--ring) #0a0b0d,
-      0 var(--depth) 0 var(--ring) #050506,
-      0 calc(var(--depth) * 2) calc(var(--btn) * 0.12) var(--ring) rgba(0, 0, 0, 0.5);
+    background: var(--yellow);
+    color: var(--black);
+    font-family: var(--font-display);
+    font-size: 28px;
+    letter-spacing: 1px;
+    box-shadow: 0 10px 0 var(--yellow-edge), 0 0 0 10px var(--red-darker);
+  }
+  #startBtn:active {
+    transform: translateY(5px);
+    box-shadow: 0 5px 0 var(--yellow-edge), 0 0 0 10px var(--red-darker);
+  }
+
+  /* --- Game view ------------------------------------------------------------ */
+  #viewGame {
+    padding: 24px 40px 36px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .game-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    align-self: stretch;
+  }
+  .title-small {
+    font-family: var(--font-display);
+    font-size: 24px;
+    color: var(--yellow);
+    text-shadow: 0 3px 0 var(--red-darker);
+  }
+  .score-box {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--black);
+    border: 4px solid var(--red-darker);
+    border-radius: 14px;
+    padding: 8px 22px;
+  }
+  .score-box .label { color: var(--yellow); }
+  #score {
+    font-family: var(--font-digits);
+    font-size: 48px;
+    line-height: 1;
+    color: var(--yellow);
+    letter-spacing: 6px;
+    white-space: pre;
+  }
+  #gameBest {
+    width: 150px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: right;
+  }
+  #buttons {
+    display: flex;
+    align-items: center;
+    gap: 44px;
+    background: var(--red-dark);
+    border-radius: 120px;
+    padding: 22px 40px;
+    box-shadow: inset 0 6px 0 var(--red-darker);
+  }
+  .btn {
+    width: 132px;
+    height: 132px;
+    border: 6px solid var(--yellow);
+    border-radius: 50%;
+    background: var(--off);
+    box-shadow: 0 8px 0 var(--edge);
     cursor: pointer;
     touch-action: none;
     will-change: transform;
     transition: transform 40ms ease-out;
   }
-  .btn.lit {
-    background:
-      radial-gradient(circle at 36% 28%, rgba(255, 255, 255, 0.65), transparent 40%),
-      radial-gradient(circle at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.18) 100%),
-      var(--on);
-    box-shadow:
-      0 0 0 var(--ring) #0a0b0d,
-      0 var(--depth) 0 var(--ring) #050506,
-      0 0 calc(var(--btn) * 0.25) calc(var(--ring) * 1.5) var(--on),
-      0 0 calc(var(--btn) * 0.4) calc(var(--ring) * 1.5) var(--glow);
+  .btn.lit, .btn.flash-on {
+    background: radial-gradient(circle at 40% 35%, #FFFFFF 0%, var(--on) 45%);
+    box-shadow: 0 8px 0 var(--edge), 0 0 40px 10px var(--on);
   }
-  /* Pressed: the cap sinks into the bezel. */
-  .btn.pressed {
-    transform: translateY(calc(var(--depth) * 0.7)) scale(0.97);
-    transition: none;
-  }
+  /* Pressed: the cap sinks onto its edge. */
+  .btn.pressed { transform: translateY(4px); transition: none; box-shadow: 0 4px 0 var(--edge); }
+  .btn.lit.pressed { box-shadow: 0 4px 0 var(--edge), 0 0 40px 10px var(--on); }
   .btn.flash { animation: flash 0.25s steps(2) infinite; }
   @keyframes flash {
     50% {
-      background:
-        radial-gradient(circle at 36% 28%, rgba(255, 255, 255, 0.65), transparent 40%),
-        var(--on);
-      box-shadow:
-        0 0 0 var(--ring) #0a0b0d,
-        0 var(--depth) 0 var(--ring) #050506,
-        0 0 calc(var(--btn) * 0.25) calc(var(--ring) * 1.5) var(--on);
+      background: radial-gradient(circle at 40% 35%, #FFFFFF 0%, var(--on) 45%);
+      box-shadow: 0 8px 0 var(--edge), 0 0 40px 10px var(--on);
     }
   }
 
-  /* --- Menu --------------------------------------------------------------
-     The menu is a row in the layout; it is only made invisible during play so
-     nothing shifts when a game starts. */
-  #menu {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6em;
-    justify-content: center;
+  /* --- Result view ---------------------------------------------------------- */
+  #viewResult {
+    padding: 28px 40px;
     align-items: center;
-    font-size: var(--menu-font);
+    justify-content: center;
+    gap: 22px;
   }
-  #menu.concealed { visibility: hidden; }
-  #menu button {
-    font: inherit;
-    font-weight: 600;
-    padding: 0.55em 1.2em;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: linear-gradient(#3b3f48, #2a2d34);
-    color: var(--text);
-    box-shadow: 0 2px 0 #0b0c0e;
-    cursor: pointer;
+  .title-mid {
+    font-family: var(--font-display);
+    font-size: 40px;
+    line-height: 1;
+    color: var(--yellow);
+    text-shadow: 0 4px 0 var(--red-darker);
   }
-  #menu button:active { transform: translateY(1px); box-shadow: 0 1px 0 #0b0c0e; }
-  #menu button.primary {
-    padding-inline: 1.8em;
-    border-color: rgba(255, 255, 255, 0.2);
-    background: linear-gradient(#e2463b, #b0261d);
-    box-shadow: 0 2px 0 #5a120d;
+  .result-row { display: flex; align-items: center; gap: 24px; }
+  .result-score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: var(--black);
+    border: 4px solid var(--red-darker);
+    border-radius: 16px;
+    padding: 14px 34px;
   }
-  #menu button.toggle {
-    font-weight: 500;
-    color: var(--text-dim);
+  .result-score .label { color: var(--yellow); }
+  #resultScore {
+    font-family: var(--font-digits);
+    font-size: 72px;
+    line-height: 1;
+    color: var(--yellow);
+    letter-spacing: 8px;
+  }
+  .result-side { display: flex; flex-direction: column; gap: 10px; }
+  #recordBadge {
+    align-self: flex-start;
+    background: var(--yellow);
+    color: var(--black);
+    font-weight: 700;
+    font-size: 16px;
+    padding: 8px 16px;
+    border-radius: 30px;
+  }
+  #resultBest { font-size: 16px; line-height: 1.4; }
+  .result-actions { display: flex; align-items: center; gap: 16px; }
+  #againBtn {
+    min-height: 44px;
+    padding: 14px 30px;
+    border: none;
+    border-radius: 40px;
+    background: var(--yellow);
+    color: var(--black);
+    font-family: var(--font-display);
+    font-size: 20px;
+    box-shadow: 0 6px 0 var(--yellow-edge);
+  }
+  #againBtn:active { transform: translateY(3px); box-shadow: 0 3px 0 var(--yellow-edge); }
+  #homeBtn {
+    min-height: 44px;
+    padding: 14px 20px;
+    border: 2px solid var(--white);
+    border-radius: 40px;
     background: transparent;
-    box-shadow: none;
+    font-weight: 600;
+    font-size: 16px;
   }
+  #homeBtn:active { background: rgba(255, 255, 255, 0.12); }
 
+  /* --- Sound / fullscreen icons: small and quiet, top-right of the card ------ */
+  #tools {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    display: flex;
+    gap: 8px;
+  }
+  #tools[hidden] { display: none; }
+  .tool {
+    width: 40px;
+    height: 40px;
+    padding: 9px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--yellow);
+    opacity: 0.55;
+  }
+  .tool:active { opacity: 1; background: var(--red-dark); }
+  .tool svg { display: block; width: 100%; height: 100%; }
+  .tool[hidden], .tool svg[hidden] { display: none; }
+
+  /* --- Portrait overlay ------------------------------------------------------- */
   #rotate {
     display: none;
     position: fixed;
@@ -203,13 +356,20 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1.5rem;
-    padding: 2rem;
-    background: var(--case-lo);
-    font-size: 1.3rem;
+    gap: 28px;
+    padding: 32px;
+    background: var(--red);
+    box-shadow: inset 0 0 0 6px var(--yellow);
     text-align: center;
   }
-  #rotate svg { width: 6rem; height: 6rem; animation: rotate-hint 2s ease-in-out infinite; }
+  #rotate svg { width: 96px; height: 96px; color: var(--yellow); animation: rotate-hint 2s ease-in-out infinite; }
+  #rotate div {
+    font-family: var(--font-display);
+    font-size: 26px;
+    line-height: 1.2;
+    color: var(--yellow);
+    text-shadow: 0 3px 0 var(--red-darker);
+  }
   @keyframes rotate-hint { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
   @media (orientation: portrait) {
     #rotate { display: flex; }
@@ -229,26 +389,84 @@
 </style>
 </head>
 <body>
-<div id="app">
-  <div id="score">
-    <div id="display" role="img" aria-label="Pisteet 0"></div>
-    <div id="best">Ennätys 0</div>
+<div id="viewport"><div id="fit"><div id="stage">
+
+  <section id="viewStart" class="view">
+    <div class="title-big">NOPEUSTESTI</div>
+    <div class="start-row">
+      <div class="stats">
+        <div class="stat-best">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="#FFD100" stroke="#FFD100" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5-4.8-4.6 6.6-.9z"/></svg>
+          <div class="stat-col">
+            <span class="label">ENNÄTYS</span>
+            <span class="value" id="startBest">000</span>
+          </div>
+        </div>
+        <div class="stat-last">
+          <span class="label">EDELLINEN</span>
+          <span class="value" id="startLast">---</span>
+        </div>
+      </div>
+      <button id="startBtn">ALOITA</button>
+    </div>
+  </section>
+
+  <section id="viewGame" class="view" hidden>
+    <div class="game-head">
+      <div class="title-small">NOPEUSTESTI</div>
+      <div class="score-box">
+        <span class="label">PISTEET</span>
+        <span id="score" role="status" aria-label="Pisteet 0">000</span>
+      </div>
+      <div id="gameBest">Ennätys 000</div>
+    </div>
+    <div id="buttons"></div>
+  </section>
+
+  <section id="viewResult" class="view" hidden>
+    <div class="title-mid">PELI PÄÄTTYI</div>
+    <div class="result-row">
+      <div class="result-score">
+        <span class="label">PISTEET</span>
+        <span id="resultScore">000</span>
+      </div>
+      <div class="result-side">
+        <div id="recordBadge">Uusi ennätys!</div>
+        <div id="resultBest">Edellinen ennätys 000</div>
+      </div>
+    </div>
+    <div class="result-actions">
+      <button id="againBtn">PELAA UUDESTAAN</button>
+      <button id="homeBtn">Alkuun</button>
+    </div>
+  </section>
+
+  <div id="tools">
+    <button id="sound" class="tool" aria-label="Äänet päällä">
+      <svg id="soundOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/>
+      </svg>
+      <svg id="soundOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden>
+        <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M17 9l5 6M22 9l-5 6"/>
+      </svg>
+    </button>
+    <button id="fullscreen" class="tool" aria-label="Koko näyttö" hidden>
+      <svg id="fsEnter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>
+      </svg>
+      <svg id="fsExit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden>
+        <path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/>
+      </svg>
+    </button>
   </div>
-  <div id="buttons"></div>
-  <div id="menu">
-    <button id="startNormal" class="primary">Aloita</button>
-    <button id="startHard">Vaikea</button>
-    <button id="resume" class="primary hidden">Jatka</button>
-    <button id="sound" class="toggle">Äänet: päällä</button>
-    <button id="fullscreen" class="toggle hidden">Koko näyttö</button>
-  </div>
-</div>
+
+</div></div></div>
 <div id="rotate">
   <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
     <rect x="20" y="6" width="24" height="52" rx="4"/>
     <line x1="29" y1="51" x2="35" y2="51"/>
   </svg>
-  <div>Käännä puhelin vaakatasoon</div>
+  <div>KÄÄNNÄ PUHELIN<br>VAAKATASOON</div>
 </div>
 <div id="debug" class="hidden"></div>
 
@@ -258,13 +476,16 @@
 // All tunables in one place.
 const CONFIG = {
   BUTTONS: [
-    // off/on: cap colour unlit/lit, glow: wide halo; tone: 1-based index into TONE_FREQS
-    { name: 'red',    off: '#5c1311', on: '#ff3b2f', glow: 'rgba(255, 50, 40, 0.45)',  tone: 1 },
-    { name: 'yellow', off: '#5e4f0c', on: '#ffe14a', glow: 'rgba(255, 225, 70, 0.4)',  tone: 2 },
-    { name: 'green',  off: '#11491a', on: '#45ff66', glow: 'rgba(60, 255, 100, 0.4)',  tone: 3 },
-    { name: 'orange', off: '#5e2c0a', on: '#ff8f26', glow: 'rgba(255, 140, 40, 0.45)', tone: 4 },
+    // Left to right. off/on: cap colour unlit/lit, edge: cap side;
+    // tone: 1-based index into TONE_FREQS (red=1, yellow=2, green=3, blue=4).
+    { name: 'yellow', off: '#7A6A1E', on: '#FFD100', edge: '#A88A00', tone: 2, label: 'Keltainen nappi' },
+    { name: 'green',  off: '#1D5E33', on: '#2BD15F', edge: '#13702F', tone: 3, label: 'Vihreä nappi' },
+    { name: 'blue',   off: '#25406E', on: '#3D8BFF', edge: '#173E85', tone: 4, label: 'Sininen nappi' },
+    { name: 'red',    off: '#6E1A1E', on: '#FF4A4A', edge: '#8A0F14', tone: 1, label: 'Punainen nappi' },
   ],
-  DIGITS: 3,             // LED display width (grows if the score needs more)
+  DIGITS: 3,             // scores are zero-padded to this many digits
+  DESIGN_WIDTH: 844,     // the layout is designed at this size and scaled to fit
+  DESIGN_HEIGHT: 390,
   // Tempo. The values measured from the original device (500 / 150 / 0.982 /
   // 0.999) felt too hard, so these are gentler.
   START_INTERVAL: 650,   // ms between lights at score 0
@@ -272,14 +493,21 @@ const CONFIG = {
   SCORE_FACTOR: 0.992,   // interval multiplier per point
   TIME_FACTOR: 0.998,    // interval multiplier per second played
   LIGHT_RATIO: 0.6,      // portion of the interval a light stays on
-  MAX_BEHIND: 50,        // queue length that ends the game
-  ALLOW_REPEAT: true,    // may the same button light twice in a row
-  HARD_START_SCORE: 100, // "Vaikea" starts at this score's speed
+  // Falling behind: while the player lags, every new light shortens the
+  // interval further, so the game soon ends. Catching up (queue below the
+  // threshold) drops the extra speed and the normal curve applies again.
+  MAX_BEHIND: 6,         // more unacknowledged lights than this ends the game (4-10)
+  BEHIND_THRESHOLD: 2,   // queue length (before the new light) that counts as behind
+  BEHIND_SPEEDUP: 0.96,  // extra interval multiplier per new light while behind (0.93-0.98)
+  // Weight of the same colour coming again after it has come r times in a
+  // row: index r-1 (capped at the last entry). The other colours weigh 1.
+  REPEAT_WEIGHTS: [0.5, 0.15, 0],
   COUNTDOWN_STEP_MS: 700, // 3-2-1 before the game, per number
-  START_DELAY: 1000,     // ms of grace after resuming from a pause
+  GAME_OVER_VIEW_MS: 1200, // the failed button flashes this long before the result view
+  RESULT_LOCK_MS: 400,   // result view ignores taps this long (no accidental restart)
   KEYS: ['KeyA', 'KeyS', 'KeyD', 'KeyF'], // desktop testing
   STORAGE_KEY: 'nopeustesti.best',
-  STORAGE_KEY_HARD: 'nopeustesti.best.hard',
+  LAST_KEY: 'nopeustesti.last', // score of the previous game
   MUTE_KEY: 'nopeustesti.muted',
 
   // Sound, measured from a recording of the original (1991). The original is a
@@ -455,11 +683,27 @@ const audio = {
 try { audio.muted = localStorage.getItem(CONFIG.MUTE_KEY) === '1'; } catch {}
 
 const $ = (id) => document.getElementById(id);
-const displayEl = $('display');
-const bestEl = $('best');
 const buttonsEl = $('buttons');
-const menuEl = $('menu');
-const resumeEl = $('resume');
+const scoreEl = $('score');
+const views = { start: $('viewStart'), game: $('viewGame'), result: $('viewResult') };
+const toolsEl = $('tools');
+
+const pad = (n) => String(n).padStart(CONFIG.DIGITS, '0');
+
+// --- Scaling -----------------------------------------------------------------
+// The whole layout keeps its proportions; the leftover space shows the dark
+// red page background.
+const fitEl = $('fit');
+const stageEl = $('stage');
+function fitStage() {
+  const scale = Math.min(
+    fitEl.clientWidth / CONFIG.DESIGN_WIDTH,
+    fitEl.clientHeight / CONFIG.DESIGN_HEIGHT
+  );
+  stageEl.style.setProperty('--scale', scale);
+}
+new ResizeObserver(fitStage).observe(fitEl);
+fitStage();
 
 // Optional latency overlay: open the page with ?debug
 const debug = new URLSearchParams(location.search).has('debug');
@@ -473,9 +717,11 @@ if (debug) debugEl.classList.remove('hidden');
 const buttonEls = CONFIG.BUTTONS.map((b, i) => {
   const el = document.createElement('div');
   el.className = 'btn';
+  el.setAttribute('role', 'button');
+  el.setAttribute('aria-label', b.label);
   el.style.setProperty('--off', b.off);
   el.style.setProperty('--on', b.on);
-  el.style.setProperty('--glow', b.glow);
+  el.style.setProperty('--edge', b.edge);
   const pointers = new Set();
 
   el.addEventListener('pointerdown', (e) => {
@@ -518,126 +764,91 @@ function debugFrame(now) {
     `fps ${debugInfo.fps}\n` +
     `input ${debugInfo.inputDelay.toFixed(1)} ms (max ${debugInfo.maxInputDelay.toFixed(1)})\n` +
     `interval ${state.phase === 'playing' ? currentInterval(now).toFixed(0) : '-'} ms\n` +
+    `behind x${state.behindFactor.toFixed(3)}\n` +
     `queue ${state.queue.length}\n` +
     `wake lock ${wake.status()}`;
   requestAnimationFrame(debugFrame);
 }
 
-// --- 7-segment LED display ---------------------------------------------------
-// Each digit is an SVG with seven hexagonal segments (a-g); unlit segments stay
-// faintly visible like on a real LED display.
-const SEGMENTS = (() => {
-  const t = 10, g = 2;             // segment thickness, gap between segments
-  const L = 6, R = 54, T = 6, M = 50, B = 94;
-  const h = (yc, x1, x2) =>
-    `${x1},${yc} ${x1 + t / 2},${yc - t / 2} ${x2 - t / 2},${yc - t / 2} ` +
-    `${x2},${yc} ${x2 - t / 2},${yc + t / 2} ${x1 + t / 2},${yc + t / 2}`;
-  const v = (xc, y1, y2) =>
-    `${xc},${y1} ${xc + t / 2},${y1 + t / 2} ${xc + t / 2},${y2 - t / 2} ` +
-    `${xc},${y2} ${xc - t / 2},${y2 - t / 2} ${xc - t / 2},${y1 + t / 2}`;
-  return {
-    a: h(T, L + g, R - g), g: h(M, L + g, R - g), d: h(B, L + g, R - g),
-    f: v(L, T + g, M - g), b: v(R, T + g, M - g),
-    e: v(L, M + g, B - g), c: v(R, M + g, B - g),
-  };
-})();
-const GLYPHS = {
-  '0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg', '4': 'bcfg',
-  '5': 'acdfg', '6': 'acdefg', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg',
-  '-': 'g', ' ': '',
-};
-
-const led = {
-  digits: [], // per digit: { a: polygonEl, b: ..., ... }
-
-  build(count) {
-    const ns = 'http://www.w3.org/2000/svg';
-    displayEl.replaceChildren();
-    this.digits = [];
-    for (let i = 0; i < count; i++) {
-      const svg = document.createElementNS(ns, 'svg');
-      svg.setAttribute('class', 'digit');
-      svg.setAttribute('viewBox', '0 0 60 100');
-      const group = document.createElementNS(ns, 'g');
-      group.setAttribute('transform', 'translate(5 0) skewX(-6) translate(5 0)');
-      const segs = {};
-      for (const [name, points] of Object.entries(SEGMENTS)) {
-        const p = document.createElementNS(ns, 'polygon');
-        p.setAttribute('points', points);
-        group.appendChild(p);
-        segs[name] = p;
-      }
-      svg.appendChild(group);
-      displayEl.appendChild(svg);
-      this.digits.push(segs);
-    }
-  },
-
-  // Right-aligned text; the display widens if the text doesn't fit.
-  show(text) {
-    const count = Math.max(CONFIG.DIGITS, text.length);
-    if (count !== this.digits.length) this.build(count);
-    const padded = text.padStart(count, ' ');
-    this.digits.forEach((segs, i) => {
-      const lit = GLYPHS[padded[i]] ?? '';
-      for (const name in segs) segs[name].classList.toggle('on', lit.includes(name));
-    });
-    displayEl.setAttribute('aria-label', text.trim());
-  },
-};
-led.show('0');
-
 // Game state
 const state = {
-  phase: 'idle',      // idle | playing | paused | over
-  hard: false,
+  phase: 'idle',      // idle | playing | over
   score: 0,
   countdown: 0,       // number currently shown in the 3-2-1 countdown
-  speedOffset: 0,     // added to score when computing speed (hard mode)
   queue: [],          // FIFO of lit-but-unacknowledged button indices
-  startTime: 0,       // performance.now() of game start (shifted on resume)
+  behindFactor: 1,    // extra interval multiplier while the player lags
+  startTime: 0,       // performance.now() of game start
   nextLightAt: 0,
   litIndex: -1,
   litUntil: 0,
   lastIndex: -1,
+  runLength: 0,       // how many times lastIndex has come in a row
   muteUntil: 0,       // tone is silenced until this time after each press
-  pausedAt: 0,
   rafId: 0,
+  timers: [],         // pending game-over timeouts, cleared on restart
 };
 
-// Normal and hard mode keep separate records.
-const best = { normal: 0, hard: 0 };
+const scores = { best: 0, last: null };
 try {
-  best.normal = parseInt(localStorage.getItem(CONFIG.STORAGE_KEY), 10) || 0;
-  best.hard = parseInt(localStorage.getItem(CONFIG.STORAGE_KEY_HARD), 10) || 0;
+  scores.best = parseInt(localStorage.getItem(CONFIG.STORAGE_KEY), 10) || 0;
+  const last = parseInt(localStorage.getItem(CONFIG.LAST_KEY), 10);
+  scores.last = Number.isFinite(last) ? last : null;
 } catch {}
 
-function renderBest(newRecord = false) {
-  bestEl.classList.toggle('record', newRecord);
-  if (newRecord) {
-    bestEl.textContent = `Uusi ennätys${state.hard ? ' (vaikea)' : ''}!`;
-    return;
-  }
-  bestEl.textContent = best.hard > 0
-    ? `Ennätys ${best.normal} · Vaikea ${best.hard}`
-    : `Ennätys ${best.normal}`;
+// --- Views -----------------------------------------------------------------
+function showView(name) {
+  for (const [key, el] of Object.entries(views)) el.hidden = key !== name;
+  // The icons would be easy to hit by accident during play.
+  toolsEl.hidden = name === 'game';
 }
-renderBest();
+
+function showStart() {
+  $('startBest').textContent = pad(scores.best);
+  $('startLast').textContent = scores.last === null ? '---' : pad(scores.last);
+  showView('start');
+}
+
+let resultShownAt = 0;
+function showResult(score, newRecord, previousBest) {
+  $('resultScore').textContent = pad(score);
+  $('recordBadge').hidden = !newRecord;
+  $('resultBest').textContent = newRecord
+    ? `Edellinen ennätys ${pad(previousBest)}`
+    : `Ennätys ${pad(scores.best)}`;
+  resultShownAt = performance.now();
+  showView('result');
+}
+
+function showScore(text) {
+  scoreEl.textContent = text;
+  scoreEl.setAttribute('aria-label', `Pisteet ${state.score}`);
+}
 
 function currentInterval(now) {
   const seconds = Math.max(0, (now - state.startTime) / 1000);
-  const s = state.score + state.speedOffset;
   return Math.max(
     CONFIG.MIN_INTERVAL,
-    CONFIG.START_INTERVAL * CONFIG.SCORE_FACTOR ** s * CONFIG.TIME_FACTOR ** seconds
+    CONFIG.START_INTERVAL
+      * CONFIG.SCORE_FACTOR ** state.score
+      * CONFIG.TIME_FACTOR ** seconds
+      * state.behindFactor
   );
 }
 
+// Weighted pick: the last colour gets a weight that drops with each repeat
+// (REPEAT_WEIGHTS), the others weigh 1. The first light is uniform.
 function pickButton() {
   const n = CONFIG.BUTTONS.length;
-  if (CONFIG.ALLOW_REPEAT || state.lastIndex < 0) return Math.floor(Math.random() * n);
-  const i = Math.floor(Math.random() * (n - 1));
-  return i >= state.lastIndex ? i + 1 : i;
+  const w = CONFIG.REPEAT_WEIGHTS;
+  const weights = Array.from({ length: n }, (_, i) =>
+    i === state.lastIndex ? w[Math.min(state.runLength, w.length) - 1] : 1);
+  let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < n; i++) {
+    r -= weights[i];
+    if (r < 0) return i;
+  }
+  // Float rounding fallback: last colour with a non-zero weight.
+  for (let i = n - 1; i >= 0; i--) if (weights[i] > 0) return i;
 }
 
 function setLit(index) {
@@ -660,15 +871,17 @@ function updateVoice(now) {
   audio.setVoiceOn(on);
 }
 
-// The game runs in phase 'playing' from the start; until startTime the display
-// shows a 3-2-1 countdown and presses are ignored.
-function startGame(hard) {
+// The game runs in phase 'playing' from the start; until startTime the score
+// display shows a 3-2-1 countdown and presses are ignored.
+function startGame() {
+  state.timers.forEach(clearTimeout);
+  state.timers = [];
   state.phase = 'playing';
-  state.hard = hard;
   state.score = 0;
-  state.speedOffset = hard ? CONFIG.HARD_START_SCORE : 0;
   state.queue = [];
+  state.behindFactor = 1;
   state.lastIndex = -1;
+  state.runLength = 0;
   state.muteUntil = 0;
   state.countdown = 0;
   audio.startVoice();
@@ -676,9 +889,10 @@ function startGame(hard) {
   state.startTime = now + 3 * CONFIG.COUNTDOWN_STEP_MS;
   state.nextLightAt = state.startTime;
   setLit(-1);
-  buttonEls.forEach((el) => el.classList.remove('flash'));
-  renderBest();
-  menuEl.classList.add('concealed');
+  buttonEls.forEach((el) => el.classList.remove('flash', 'pressed'));
+  showScore(pad(0));
+  $('gameBest').textContent = `Ennätys ${pad(scores.best)}`;
+  showView('game');
   wake.acquire();
   cancelAnimationFrame(state.rafId);
   state.rafId = requestAnimationFrame(tick);
@@ -693,8 +907,10 @@ function tick(now) {
   // Catch up on every light that is due; timestamps are absolute, so no drift.
   while (now >= state.nextLightAt) {
     const at = state.nextLightAt;
+    if (state.queue.length >= CONFIG.BEHIND_THRESHOLD) state.behindFactor *= CONFIG.BEHIND_SPEEDUP;
     const interval = currentInterval(at);
     const index = pickButton();
+    state.runLength = index === state.lastIndex ? state.runLength + 1 : 1;
     state.lastIndex = index;
     state.queue.push(index);
     state.litUntil = at + interval * CONFIG.LIGHT_RATIO;
@@ -719,10 +935,10 @@ function updateCountdown(now) {
   if (n === state.countdown) return;
   state.countdown = n;
   if (n > 0) {
-    led.show(String(n));
+    showScore(String(n).padStart(Math.ceil((CONFIG.DIGITS + 1) / 2)).padEnd(CONFIG.DIGITS));
     audio.countdownBeep();
   } else {
-    led.show(String(state.score));
+    showScore(pad(state.score));
   }
 }
 
@@ -737,75 +953,81 @@ function press(index) {
     return;
   }
   state.queue.shift();
+  if (state.queue.length < CONFIG.BEHIND_THRESHOLD) state.behindFactor = 1; // caught up
   state.score++;
-  led.show(String(state.score));
+  showScore(pad(state.score));
 }
 
+// Ends the game and records the score. flashIndex: button to flash before the
+// result view; -1 (interrupted) goes straight to the result.
 function gameOver(flashIndex) {
   state.phase = 'over';
   cancelAnimationFrame(state.rafId);
   setLit(-1);
-  audio.gameOver();
   wake.release();
-  buttonEls[flashIndex].classList.add('flash');
-  setTimeout(() => buttonEls[flashIndex].classList.remove('flash'), 1500);
 
-  const mode = state.hard ? 'hard' : 'normal';
-  if (state.score > best[mode]) {
-    best[mode] = state.score;
-    const key = state.hard ? CONFIG.STORAGE_KEY_HARD : CONFIG.STORAGE_KEY;
-    try { localStorage.setItem(key, String(state.score)); } catch {}
-    renderBest(true);
+  const previousBest = scores.best;
+  const newRecord = state.score > scores.best;
+  scores.last = state.score;
+  if (newRecord) scores.best = state.score;
+  try {
+    localStorage.setItem(CONFIG.LAST_KEY, String(scores.last));
+    if (newRecord) localStorage.setItem(CONFIG.STORAGE_KEY, String(scores.best));
+  } catch {}
+
+  const score = state.score;
+  if (flashIndex < 0) {
+    audio.stopVoice();
+    audio.stopOneShots();
+    showResult(score, newRecord, previousBest);
+    return;
   }
-  // Short lockout so a frantic extra tap doesn't immediately restart.
-  setTimeout(() => {
-    if (state.phase === 'over') menuEl.classList.remove('concealed');
-  }, 800);
+  audio.gameOver();
+  buttonEls[flashIndex].classList.add('flash');
+  state.timers.push(setTimeout(() => {
+    buttonEls[flashIndex].classList.remove('flash');
+    showResult(score, newRecord, previousBest);
+  }, CONFIG.GAME_OVER_VIEW_MS));
 }
 
-function pause() {
+// There is no pause: leaving the app or turning the phone ends the game. During
+// the countdown nothing has happened yet, so it just returns to the start view.
+function interrupt() {
   if (state.phase !== 'playing') return;
-  state.phase = 'paused';
-  state.pausedAt = performance.now();
-  cancelAnimationFrame(state.rafId);
-  setLit(-1);
-  updateVoice(state.pausedAt);
-  menuEl.classList.remove('concealed');
-  $('startNormal').classList.add('hidden');
-  $('startHard').classList.add('hidden');
-  resumeEl.classList.remove('hidden');
+  if (performance.now() < state.startTime) {
+    state.phase = 'idle';
+    cancelAnimationFrame(state.rafId);
+    audio.stopVoice();
+    audio.stopOneShots();
+    wake.release();
+    showStart();
+    return;
+  }
+  gameOver(-1);
 }
 
-function resume() {
-  if (state.phase !== 'paused') return;
-  // Shift all timestamps by the paused duration plus a short grace period.
-  const shift = performance.now() - state.pausedAt + CONFIG.START_DELAY;
-  state.startTime += shift;
-  state.nextLightAt += shift;
-  state.litUntil += shift;
-  // Keep the tone silent during the grace period too.
-  state.muteUntil = Math.max(state.muteUntil + shift, performance.now() + CONFIG.START_DELAY);
-  state.phase = 'playing';
-  menuEl.classList.add('concealed');
-  $('startNormal').classList.remove('hidden');
-  $('startHard').classList.remove('hidden');
-  resumeEl.classList.add('hidden');
-  state.rafId = requestAnimationFrame(tick);
-}
-
-$('startNormal').addEventListener('click', () => startGame(false));
-$('startHard').addEventListener('click', () => startGame(true));
-resumeEl.addEventListener('click', resume);
+$('startBtn').addEventListener('click', startGame);
+$('againBtn').addEventListener('click', () => {
+  if (performance.now() - resultShownAt < CONFIG.RESULT_LOCK_MS) return;
+  startGame();
+});
+$('homeBtn').addEventListener('click', () => {
+  if (performance.now() - resultShownAt < CONFIG.RESULT_LOCK_MS) return;
+  state.phase = 'idle';
+  showStart();
+});
 
 const soundEl = $('sound');
-const updateSoundLabel = () => {
-  soundEl.textContent = audio.muted ? 'Äänet: pois' : 'Äänet: päällä';
+const updateSoundIcon = () => {
+  $('soundOn').hidden = audio.muted;
+  $('soundOff').hidden = !audio.muted;
+  soundEl.setAttribute('aria-label', audio.muted ? 'Äänet pois' : 'Äänet päällä');
 };
-updateSoundLabel();
+updateSoundIcon();
 soundEl.addEventListener('click', () => {
   audio.setMuted(!audio.muted);
   try { localStorage.setItem(CONFIG.MUTE_KEY, audio.muted ? '1' : '0'); } catch {}
-  updateSoundLabel();
+  updateSoundIcon();
 });
 
 // Unlock audio on any user gesture (capture phase, so it runs before the
@@ -823,7 +1045,7 @@ const fsElement = () => document.fullscreenElement || document.webkitFullscreenE
 const installed = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches
   || navigator.standalone === true;
 if (!installed && (document.fullscreenEnabled || document.webkitFullscreenEnabled)) {
-  fullscreenEl.classList.remove('hidden');
+  fullscreenEl.hidden = false;
 }
 
 async function toggleFullscreen() {
@@ -840,17 +1062,19 @@ async function toggleFullscreen() {
   }
 }
 
-const updateFullscreenLabel = () => {
-  fullscreenEl.textContent = fsElement() ? 'Poistu koko näytöstä' : 'Koko näyttö';
+const updateFullscreenIcon = () => {
+  const on = Boolean(fsElement());
+  $('fsEnter').hidden = on;
+  $('fsExit').hidden = !on;
+  fullscreenEl.setAttribute('aria-label', on ? 'Poistu koko näytöstä' : 'Koko näyttö');
 };
 fullscreenEl.addEventListener('click', toggleFullscreen);
-document.addEventListener('fullscreenchange', updateFullscreenLabel);
-document.addEventListener('webkitfullscreenchange', updateFullscreenLabel);
+document.addEventListener('fullscreenchange', updateFullscreenIcon);
+document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
 
 // --- Screen Wake Lock --------------------------------------------------------
-// Keeps the screen on while a game is running or paused. Requires a secure
-// context (HTTPS or localhost). The browser drops the lock when the page is
-// hidden, so it is re-requested on return.
+// Keeps the screen on while a game is running. Requires a secure context
+// (HTTPS or localhost). The browser drops the lock when the page is hidden.
 const wake = {
   lock: null,
   async acquire() {
@@ -873,16 +1097,12 @@ const wake = {
 };
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    pause();
-  } else if (state.phase === 'playing' || state.phase === 'paused') {
-    wake.acquire();
-  }
+  if (document.hidden) interrupt();
 });
 
-// Turning to portrait covers the game, so pause it.
+// Turning to portrait covers the game, so it ends.
 matchMedia('(orientation: portrait)').addEventListener('change', (e) => {
-  if (e.matches) pause();
+  if (e.matches) interrupt();
 });
 
 document.addEventListener('keydown', (e) => {
@@ -909,6 +1129,7 @@ document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: fal
 // still get their click events. This also stops iOS text-selection loupes.
 buttonsEl.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
 
+showStart();
 if (debug) requestAnimationFrame(debugFrame);
 
 // --- PWA: offline cache --------------------------------------------------------

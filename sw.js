@@ -4,7 +4,7 @@
 // install. Responses are served from the cache immediately and refreshed in
 // the background (stale-while-revalidate), so a new version shows up on the
 // next launch. Bump CACHE_VERSION when the file list changes.
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `nopeustesti-${CACHE_VERSION}`;
 const APP_FILES = [
   './',
@@ -13,6 +13,9 @@ const APP_FILES = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
+  './fonts/bungee-latin.woff2',
+  './fonts/rubik-latin.woff2',
+  './fonts/share-tech-mono-latin.woff2',
 ];
 
 self.addEventListener('install', (event) => {

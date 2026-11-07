@@ -1,5 +1,7 @@
 # Nopeustesti – selainversio (spesifikaatio Claude Codelle)
 
+> **Huom.** Myöhemmät muutokset (jälkeen jäämisen kiihdytys, toistojen painotus, uusi ulkoasu) on kuvattu tiedostossa `NOPEUSTESTI_MUUTOKSET.md`, ja toteutuksen nykytila on `progress.md`:ssä. Ne menevät tämän dokumentin edelle.
+
 ## Tavoite
 Rakenna mahdollisimman uskollinen selainkopio suomalaisesta Nopeustesti-reaktiopelistä (Coinline Oy, tunnettu Speden Speleistä). Peli pelataan puhelimella vaakatilassa, ja sen pitää skaalautua kaikille näytöille. Käytä omaa grafiikkaa – älä kopioi Coinlinen tai Speden Spelien logoja tai tavaramerkkejä.
 
@@ -22,8 +24,7 @@ Rakenna mahdollisimman uskollinen selainkopio suomalaisesta Nopeustesti-reaktiop
    `interval = max(MIN_INTERVAL, START_INTERVAL * SCORE_FACTOR^score * TIME_FACTOR^seconds)`
    Kaikki vakiot `CONFIG`-objektiin yhteen paikkaan, jotta tuntumaa voi säätää.
 7. Satunnaisuus: oletuksena sama nappi voi syttyä kahdesti peräkkäin; tee tästä asetus (`ALLOW_REPEAT`).
-8. Vaikeustaso "Vaikea": peli alkaa pistemäärästä 100 vastaavalla nopeudella (kuten osassa alkuperäisistä laitteista).
-9. Pelin lopussa: väärä/viimeinen nappi vilkkuu, lyhyt "game over" -ääni, pisteet jäävät näytölle. Ennätys tallentuu `localStorage`en.
+8. Pelin lopussa: väärä/viimeinen nappi vilkkuu, lyhyt "game over" -ääni, pisteet jäävät näytölle. Ennätys tallentuu `localStorage`en.
 
 ## Ajoitus ja vasteaika (tärkeää)
 - Käytä `pointerdown`-tapahtumia (ei `click`), jotta viivettä ei tule.
@@ -79,7 +80,7 @@ Värikohtaista kytkentää ei voinut päätellä äänestä. Tee siitä `CONFIG`
 - Tumma tausta, joka muistuttaa laitteen koteloa.
 
 ## Valikko
-- Aloitusnäkymä: "Aloita" (normaali), "Vaikea", ennätys, äänet päälle/pois, koko näyttö.
+- Aloitusnäkymä: "Aloita", ennätys, äänet päälle/pois, koko näyttö.
 - Lyhyt 3–2–1-lähtölaskenta ennen pelin alkua.
 
 ## Laatuvaatimukset
