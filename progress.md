@@ -13,7 +13,7 @@ Muutospyyntö `NOPEUSTESTI_MUUTOKSET.md` (jälkeen jääminen, toistojen painotu
 
 ## Tiedostot
 - `index.html` – koko peli (HTML + CSS + JS). Kaikki säädöt `CONFIG`-objektissa.
-- `manifest.json`, `sw.js` (stale-while-revalidate, `CACHE_VERSION` nostettava kun tiedostolista muuttuu; nyt `v2`), `icons/` (192, 512, apple-touch 180).
+- `manifest.json`, `sw.js` (sivu network-first 3 s aikakatkaisulla, muut tiedostot stale-while-revalidate; `CACHE_VERSION` nostettava kun tiedostolista tai SW muuttuu; nyt `v3`. Aiempi pelkkä stale-while-revalidate näytti päivityksen vasta toisella avauksella, ja käyttäjä näki vanhan tulosnäkymän), `icons/` (192, 512, apple-touch 180).
 - `fonts/` – Bungee, Rubik (variable, kattaa painot 400/600/700) ja Share Tech Mono, Google Fontsin latin-osajoukot (sis. ä/ö) itse hostattuina, jotta peli toimii offline. Service worker cachettaa vain saman originin tiedostot, joten Google Fonts -linkki ei olisi toiminut offline.
 - Kuvakkeet generoitiin stdlib-Python-skriptillä (ei Pillowia koneella); skripti oli vain scratchpadissa. Kuvakkeet ovat yhä vanhan tumman tyylin mukaiset.
 
