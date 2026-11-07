@@ -46,4 +46,4 @@ Muutospyyntö `NOPEUSTESTI_MUUTOKSET.md` (jälkeen jääminen, toistojen painotu
 ## Testaus
 - Paikallinen palvelin: `python -m http.server 8000 --bind 0.0.0.0`, puhelimella http://192.168.1.152:8000
 - Wake Lock ja service worker vaativat HTTPS:n (tai localhostin) → eivät toimi LAN-osoitteessa. Testaa ne GitHub Pages -osoitteessa.
-- Headless-Chrome + CDP: Node 24:n sisäänrakennettu WebSocket riittää (Pythonista puuttuu websocket-moduuli). Chrome tarvitsee absoluuttisen `--user-data-dir`-polun. Tarkistettu 844×390, 667×375, 1024×768 ja pystytila, ei konsolivirheitä. Ääntä ei ole voitu kuunnella – käyttäjä testaa korvalla. Wake lockia ei ole vielä varmistettu oikealla puhelimella.
+- Headless-Chrome + CDP: Node 24:n sisäänrakennettu WebSocket riittää (Pythonista puuttuu websocket-moduuli). Chrome tarvitsee absoluuttisen `--user-data-dir`-polun. Tarkistettu 844×390, 667×375, 1024×768 ja pystytila, ei konsolivirheitä. Ääntä ei ole voitu kuunnella – käyttäjä testaa korvalla. Wake lock varmistettu toimivaksi käyttäjän puhelimella Pages-osoitteessa (`?debug`, 2026-11-07).
